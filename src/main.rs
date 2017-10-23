@@ -11,13 +11,111 @@ enum Token { //<'a>
   //Identifier { name: &'a str },
   Identifier { name: String },
   Eof,
-  Assignment
+  Assignment,
+  Semi
 }
 
 #[derive(Debug)]
 enum Ast {
   Term { factors: Vec<i32> },
   Factor { value: i32 }
+}
+
+trait Tokenizer {
+  fn tokenize(&self) -> Vec<Token>;
+}
+
+use std::iter::Peekable;
+use std::str::Chars;
+
+fn consume_while<F>(it: &mut Peekable<Chars>, x: F)
+  -> Vec<char>
+  where F : Fn(char) -> bool {
+
+  let mut v: Vec<char> = vec![];
+
+  while let Some(&ch) = it.peek() {
+    if x(ch) {
+      it.next().unwrap();
+      v.push(ch);
+    }
+    else {
+      break;
+    }
+  }
+
+  v
+}
+
+impl Tokenizer for String {
+  fn tokenize(&self) -> Vec<Token> {
+    let mut it = self.chars().peekable();
+    let mut tokens: Vec<Token> = vec![];
+
+    loop {
+      match it.peek() {
+        Some(&ch) => match ch {
+          '0' ... '9' => {
+            
+            let s: String = consume_while(&mut it, |a| a.is_numeric())
+              .into_iter()
+              .collect();
+
+            let num: i32 = s.parse::<i32>().unwrap();
+
+            tokens.push(Token::Number { value: num });
+          },
+          'a' ... 'z' => {
+            let s: String = consume_while(&mut it, |a| a.is_numeric() ||
+                                          a.is_alphabetic())
+              .into_iter()
+              .collect();
+
+            tokens.push(Token::Identifier { name : s });
+          },
+          '-' => {
+            it.next().unwrap();
+            tokens.push(Token::Sub);
+          },
+          '*' => {
+            it.next().unwrap();
+            tokens.push(Token::Mul);
+          },
+          '/' => {
+            it.next().unwrap();
+            tokens.push(Token::Div);
+          },
+          '+' => {
+            it.next().unwrap();
+            tokens.push(Token::Add);
+          },
+          '(' => {
+            it.next().unwrap();
+            tokens.push(Token::LeftParenthesis);
+          },
+          ')' => {
+            it.next().unwrap();
+            tokens.push(Token::RightParenthesis);
+          },
+          '=' => {
+            it.next().unwrap();
+            tokens.push(Token::Assignment);
+          },
+          ' ' => {
+            it.next().unwrap();
+          },
+          ';' => {
+            it.next().unwrap();
+            tokens.push(Token::Semi);
+          },
+          _ => panic!("invalid char")
+        },
+        None => break
+      }
+    }
+
+    tokens
+  }
 }
 
 fn parse_stmt(tokens: &mut Vec<Token>) -> Option<Ast> {
@@ -128,6 +226,8 @@ fn parse_factor(tokens: &mut Vec<Token>) -> Option<Ast> {
   }
 }
 
+
+
 fn tokenize(filename: &str) -> Result<Vec<Token>, std::io::Error> {
   let mut contents = String::new();
 
@@ -137,68 +237,7 @@ fn tokenize(filename: &str) -> Result<Vec<Token>, std::io::Error> {
     f.read_to_string(&mut contents)?;
   }
 
-  let mut iter =  contents.chars();
-  let mut tokens = Vec::new();
-
-  loop {
-
-    let token: Option<Token> = match iter.next() {
-      None => Some(Token::Eof),
-      Some(c) => match c {
-        '(' => Some(Token::LeftParenthesis),
-        ')' => Some(Token::RightParenthesis),
-        '+' => Some(Token::Add),
-        '-' => Some(Token::Sub),
-        '*' => Some(Token::Mul),
-        '/' => Some(Token::Div),
-        ' ' => None,
-        '=' => Some(Token::Assignment),
-        '0'...'9' => {
-          let number_str: String = iter
-            .by_ref()
-            .take_while(|c: &char| char::is_digit(*c, 10))
-            .collect();
-
-          let mut complete_number_str = String::new();
-          complete_number_str.push(c);
-          complete_number_str.push_str(&number_str);
-
-          let number: i32 = complete_number_str
-            .parse()
-            .unwrap();
-
-          Some(Token::Number { value: number })
-        },
-
-        'a'...'z' => {
-          let id: String = iter
-            .by_ref()
-            .take_while(|c: &char| char::is_digit(*c, 10) ||
-                        char::is_alphabetic(*c))
-            .collect();
-
-          let mut complete_id = String::new();
-          complete_id.push(c);
-          complete_id.push_str(&id);
-
-          Some(Token::Identifier { name: complete_id })
-        },
-
-        _ => Some(Token::InvalidToken)
-      }
-    };
-
-    match token {
-      Some(Token::Eof) => {
-        tokens.push(Token::Eof);
-        break
-      },
-      Some(t) => tokens.push(t),
-      _ => {}
-    }
-  }
-
-  Ok(tokens)
+  Ok(contents.tokenize())
 }
 
 fn main() {
@@ -214,7 +253,7 @@ fn main() {
         println!("{:?}: {:?}", i, token);
       }
 
-      parse_stmt(&mut tokens);
+      //parse_stmt(&mut tokens);
     }
   }
 
