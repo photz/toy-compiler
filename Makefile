@@ -8,4 +8,7 @@ watch:
 
 build:
 	cargo run test.php
-
+	@echo "======================="
+	@cat out.s
+	@echo "======================="
+	gcc -g -c out.s && ld out.o && ./a.out
